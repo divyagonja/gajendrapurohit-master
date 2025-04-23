@@ -1,46 +1,159 @@
 import { useEffect, useState, useRef } from "react";
-import { GalleryHorizontal } from "lucide-react";
-import { getEventImages, DriveImage } from "../utils/googleDriveApi";
+import { GalleryHorizontal, RefreshCw } from "lucide-react";
+import { getEventImages, DriveImage, signIn, signOut, initOAuth, FOLDER_ID, API_KEY, clearImageCache } from "../utils/googleDriveApi";
+
+// Preload all images to avoid CORS issues
+const preloadImage = (url: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => reject();
+    img.src = url;
+  });
+};
+
+// Add this constant at the top of the file after imports
+const PLACEHOLDER_IMAGE_URL = "/placeholder-image.svg";
 
 const EventsGallery = () => {
   const [images, setImages] = useState<DriveImage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<{
+    folderIdSet: boolean;
+    apiKeySet: boolean;
+    imagesAttempted: boolean;
+    imagesLoaded: number;
+  }>({
+    folderIdSet: Boolean(FOLDER_ID),
+    apiKeySet: Boolean(API_KEY),
+    imagesAttempted: false,
+    imagesLoaded: 0
+  });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [imgLoadAttempts, setImgLoadAttempts] = useState<Record<number, number>>({});
+  const [retryCount, setRetryCount] = useState(0);
+  const [forceRefresh, setForceRefresh] = useState(0);
 
   useEffect(() => {
     console.log("EventsGallery: Component mounted");
-    loadImages();
+    console.log("Environment configuration:", {
+      FOLDER_ID,
+      API_KEY,
+      VITE_DRIVE_FOLDER_ID: import.meta.env.VITE_DRIVE_FOLDER_ID,
+      VITE_DRIVE_API_KEY: import.meta.env.VITE_DRIVE_API_KEY
+    });
+    
+    // Try to initialize OAuth first, then load images
+    const init = async () => {
+      try {
+        // Check if user is already authenticated
+        const isAuthed = await initOAuth();
+        setIsAuthenticated(isAuthed);
+        console.log(`EventsGallery: Authentication status: ${isAuthed ? 'Authenticated' : 'Not authenticated'}`);
+      } catch (error) {
+        console.error('Error initializing OAuth:', error);
+      }
+      
+      // Load images regardless of authentication status
+      loadImages();
+    };
+    
+    init();
 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
-  }, []);
+  }, [forceRefresh]);
 
   const loadImages = async () => {
     setIsLoading(true);
     setError(null);
+    setImgLoadAttempts({});
     
     try {
       console.log("EventsGallery: Fetching images...");
+      setDiagnosticInfo(prev => ({ ...prev, imagesAttempted: true }));
+      
       const imagesData = await getEventImages();
-      console.log(`EventsGallery: Received ${imagesData.length} images`);
+      console.log(`EventsGallery: Received ${imagesData.length} images`, imagesData);
       
       if (imagesData.length === 0) {
         throw new Error("No images were loaded");
       }
       
+      // Store the images first so UI shows something quickly
       setImages(imagesData);
+      
+      // Then preload all main image URLs in the background
+      // We do this after setting the state so the UI is responsive
+      let loadedCount = 0;
+      
+      setTimeout(() => {
+        imagesData.forEach((image, index) => {
+          // Try to preload the main image
+          preloadImage(image.src)
+            .then(() => {
+              console.log(`Preloaded image ${index}: ${image.fileName}`);
+              loadedCount++;
+              setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
+            })
+            .catch(() => {
+              console.log(`Failed to preload image ${index}, trying alternates`);
+              // Try each alternate URL
+              let triedAlternateUrl = false;
+              
+              image.alternateUrls.forEach((altUrl, altIndex) => {
+                if (!triedAlternateUrl) {
+                  preloadImage(altUrl)
+                    .then(() => {
+                      console.log(`Successfully loaded alternate URL ${altIndex} for image ${index}`);
+                      // Update the image source to the working URL
+                      triedAlternateUrl = true;
+                      loadedCount++;
+                      setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
+                      
+                      // Update the specific image with the working URL
+                      setImages(currentImages => {
+                        const updatedImages = [...currentImages];
+                        if (updatedImages[index]) {
+                          updatedImages[index].src = altUrl;
+                        }
+                        return updatedImages;
+                      });
+                    })
+                    .catch(() => {
+                      console.log(`Failed to load alternate URL ${altIndex} for image ${index}`);
+                    });
+                }
+              });
+            });
+        });
+      }, 100);
+      
+      setRetryCount(0); // Reset retry count on success
     } catch (error) {
       console.error("Error loading images:", error);
       setError("Failed to load images. Please check console for details.");
+      
+      // Retry loading a few times if failed
+      if (retryCount < 3) {
+        console.log(`Retrying image load... Attempt ${retryCount + 1}/3`);
+        setRetryCount(prev => prev + 1);
+        setTimeout(loadImages, 2000); // Wait 2 seconds before retrying
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForceRefresh = () => {
+    clearImageCache();
+    setForceRefresh(prev => prev + 1);
   };
 
   // Start auto-play when images are loaded
@@ -89,35 +202,129 @@ const EventsGallery = () => {
     } else {
       // All alternates failed, use placeholder
       console.log(`EventsGallery: All URLs failed for image ${index}, using placeholder`);
-      target.src = `https://via.placeholder.com/800x600?text=Image+${index+1}+Not+Available`;
+      target.src = PLACEHOLDER_IMAGE_URL;
     }
+  };
+
+  const handleThumbnailError = (index: number, e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    console.log(`EventsGallery: Thumbnail ${index} failed to load`);
+    
+    // Try using the main image if the thumbnail fails
+    const currentImg = images[index];
+    if (currentImg.src && currentImg.src !== target.src) {
+      target.src = currentImg.src;
+    } else {
+      target.src = `https://via.placeholder.com/100x100?text=${index+1}`;
+    }
+  };
+
+  const handleAuthSignIn = async () => {
+    try {
+      const success = await signIn();
+      setIsAuthenticated(success);
+      if (success) {
+        console.log("Auth successful, reloading images with permissions");
+        loadImages(); // Reload images with new authentication
+      }
+    } catch (error) {
+      console.error("Error signing in:", error);
+    }
+  };
+
+  const handleAuthSignOut = async () => {
+    try {
+      await signOut();
+      setIsAuthenticated(false);
+      console.log("Signed out, reloading images without permissions");
+      loadImages(); // Reload images without authentication
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  const renderDiagnosticInfo = () => {
+    if (error && diagnosticInfo.imagesAttempted) {
+      return (
+        <div className="mt-4 p-4 bg-yellow-100 border border-yellow-400 rounded text-sm">
+          <h3 className="font-bold mb-2">Diagnostic Information:</h3>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Drive Folder ID: {diagnosticInfo.folderIdSet ? '✅ Set' : '❌ Missing'}</li>
+            <li>API Key: {diagnosticInfo.apiKeySet ? '✅ Set' : '❌ Missing'}</li>
+            <li>Current Folder ID: {FOLDER_ID || 'Not available'}</li>
+            <li>Images successfully loaded: {diagnosticInfo.imagesLoaded || 0}</li>
+            {!diagnosticInfo.folderIdSet && (
+              <li className="text-red-600">Add VITE_DRIVE_FOLDER_ID to your .env file</li>
+            )}
+            {!diagnosticInfo.apiKeySet && (
+              <li className="text-red-600">Add VITE_DRIVE_API_KEY to your .env file</li>
+            )}
+            <li className="mt-2">
+              <button 
+                onClick={handleForceRefresh}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-xs flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" /> Force Refresh
+              </button>
+            </li>
+          </ul>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
     <section id="events" className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center gap-4 mb-8">
-          <GalleryHorizontal className="w-8 h-8 text-blue-600" />
-          <h2 className="text-3xl font-bold">Event Photo Gallery</h2>
-        </div>
-        
-        <div className="mb-4">
-          <button 
-            onClick={loadImages}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            Reload Gallery
-          </button>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <GalleryHorizontal className="w-8 h-8 text-blue-600" />
+            <h2 className="text-3xl font-bold">Event Photo Gallery</h2>
+          </div>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={handleForceRefresh}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? 'Loading...' : 'Refresh Gallery'}
+            </button>
+            
+            {!isAuthenticated ? (
+              <button 
+                onClick={handleAuthSignIn}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-2"
+                disabled={isLoading}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748z"/>
+                </svg>
+                Sign in with Google
+              </button>
+            ) : (
+              <button 
+                onClick={handleAuthSignOut}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                disabled={isLoading}
+              >
+                Sign Out
+              </button>
+            )}
+          </div>
         </div>
         
         {isLoading ? (
           <div className="text-center py-16">
             <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
-            <p className="mt-4">Loading event photos...</p>
+            <p className="mt-4">Loading event photos{retryCount > 0 ? ` (Retry ${retryCount}/3)` : ''}...</p>
           </div>
         ) : error ? (
           <div className="text-center py-16 text-red-500">
             <p>{error}</p>
+            {renderDiagnosticInfo()}
           </div>
         ) : images.length > 0 ? (
           <div className="space-y-8">
@@ -180,11 +387,7 @@ const EventsGallery = () => {
                     alt={`Thumbnail ${i+1}`}
                     className="h-full w-full object-cover"
                     loading="lazy"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      console.log(`EventsGallery: Thumbnail ${i} failed to load`);
-                      target.src = `https://via.placeholder.com/100x100?text=${i+1}`;
-                    }}
+                    onError={(e) => handleThumbnailError(i, e)}
                   />
                 </button>
               ))}
@@ -193,6 +396,7 @@ const EventsGallery = () => {
         ) : (
           <div className="text-center py-16">
             <p>No images found.</p>
+            {renderDiagnosticInfo()}
           </div>
         )}
       </div>

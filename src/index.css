@@ -1,47 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-@layer components {
-  .reveal-container {
-    @apply overflow-hidden;
-  }
-  
-  .reveal-text {
-    @apply opacity-0 translate-y-full;
-  }
-  
-  .reveal-text.revealed {
-    @apply animate-text-reveal;
-  }
-  
-  .section-title {
-    @apply text-3xl md:text-4xl font-bold mb-8 relative;
-  }
-  
-  .section-title::after {
-    content: "";
-    @apply absolute bottom-0 left-0 w-16 h-1 bg-primary rounded-full;
-  }
-  
-  .hover-card {
-    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
-  }
-  
-  .footer-gradient {
-    background: linear-gradient(90deg, 
-      #ff6b6b, 
-      #a18cd1, 
-      #fbc2eb, 
-      #45caff, 
-      #fad0c4, 
-      #6a5af9,
-      #ff9a8b);
-    background-size: 300% 300%;
-  }
-}
 
 @layer base {
   :root {
@@ -138,6 +99,64 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .reveal-container {
+    @apply overflow-hidden;
+  }
+  
+  .reveal-text {
+    @apply opacity-0 translate-y-full;
+  }
+  
+  .reveal-text.revealed {
+    @apply animate-text-reveal;
+  }
+  
+  .section-title {
+    @apply text-3xl md:text-4xl font-bold mb-8 relative;
+  }
+  
+  .section-title::after {
+    content: "";
+    @apply absolute bottom-0 left-0 w-16 h-1 bg-primary rounded-full;
+  }
+  
+  .hover-card {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+  
+  .footer-gradient {
+    background: linear-gradient(90deg, 
+      #ff6b6b, 
+      #a18cd1, 
+      #fbc2eb, 
+      #45caff, 
+      #fad0c4, 
+      #6a5af9,
+      #ff9a8b);
+    background-size: 300% 300%;
+  }
+
+  .animate-gradient {
+    background-size: 400%;
+    -webkit-animation: gradient 8s ease infinite;
+    -moz-animation: gradient 8s ease infinite;
+    animation: gradient 8s ease infinite;
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 }
 

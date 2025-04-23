@@ -50,7 +50,7 @@ const Footer = () => {
         
         <div className="flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            &copy; {currentYear} Dr.Gajendra Purohit All rights reserved.
+            &copy; {currentYear} Dr.Gajendra Purohit All rights reserved. Designed by Divya Gonja
           </p>
           
           <div className="flex space-x-6 mt-4 md:mt-0 items-center">
