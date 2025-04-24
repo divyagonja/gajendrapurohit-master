@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import { GalleryHorizontal, RefreshCw } from "lucide-react";
+import { GalleryHorizontal, RefreshCw, ExternalLink, Youtube } from "lucide-react";
 import { getEventImages, DriveImage, signIn, signOut, initOAuth, FOLDER_ID, API_KEY, clearImageCache } from "../utils/googleDriveApi";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 // Preload all images to avoid CORS issues
 const preloadImage = (url: string): Promise<void> => {
@@ -14,6 +16,45 @@ const preloadImage = (url: string): Promise<void> => {
 
 // Add this constant at the top of the file after imports
 const PLACEHOLDER_IMAGE_URL = "/placeholder-image.svg";
+
+// Motivational talks data
+const motivationalTalks = [
+  {
+    id: 1,
+    title: "How to Stay Motivated for Competitive Exams",
+    description: "Master the mindset needed to stay motivated throughout your competitive exam preparation journey.",
+    image: "/images/182A4172-e1728803050785.jpg",
+    youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
+  },
+  {
+    id: 2,
+    title: "Overcoming Math Anxiety",
+    description: "Learn practical strategies to overcome math anxiety and build confidence in solving complex mathematical problems.",
+    image: "/images/182A4172-e1728803050785.jpg",
+    youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
+  },
+  {
+    id: 3,
+    title: "Success Mindset for Students",
+    description: "Develop the growth mindset that will help you achieve academic excellence and succeed in your educational journey.",
+    image: "/images/182A4172-e1728803050785.jpg",
+    youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
+  },
+  {
+    id: 4,
+    title: "Effective Study Strategies",
+    description: "Discover research-backed study techniques that will maximize your learning efficiency and retention.",
+    image: "/images/182A4172-e1728803050785.jpg",
+    youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
+  },
+  {
+    id: 5,
+    title: "Balancing Studies and Personal Life",
+    description: "Learn how to maintain a healthy balance between academic pursuits and personal well-being for sustainable success.",
+    image: "/images/182A4172-e1728803050785.jpg",
+    youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
+  }
+];
 
 const EventsGallery = () => {
   const [images, setImages] = useState<DriveImage[]>([]);
@@ -275,7 +316,40 @@ const EventsGallery = () => {
   };
 
   return (
-    <section id="events" className="py-20 bg-gray-50">
+    <section id="events-gallery" className="py-16 bg-muted/10">
+      {/* Motivational Talks Section */}
+      <div className="container mx-auto px-6 mb-20">
+        <h2 className="text-3xl md:text-4xl font-bold mb-8 text-center relative">
+          Motivational Talks
+          <span className="block w-20 h-1 bg-primary mx-auto mt-4"></span>
+        </h2>
+        <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12">
+          Get inspired by Dr. Gajendra Purohit's motivational talks that help students overcome challenges and achieve academic excellence.
+        </p>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          {motivationalTalks.map((talk) => (
+            <Card key={talk.id} className="h-36 shadow-sm hover:shadow-md transition-shadow">
+              {/* Empty card */}
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <div className="container mx-auto px-6 text-center">
+          <p className="text-red-500">{error}</p>
+          {!diagnosticInfo.folderIdSet && <p className="text-yellow-500">Folder ID is not set!</p>}
+          {!diagnosticInfo.apiKeySet && <p className="text-yellow-500">API Key is not set!</p>}
+          <button 
+            onClick={handleForceRefresh} 
+            className="mt-4 flex items-center gap-2 mx-auto bg-muted px-4 py-2 rounded-md hover:bg-muted/80 transition-colors"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
@@ -313,11 +387,6 @@ const EventsGallery = () => {
           <div className="text-center py-16">
             <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
             <p className="mt-4">Loading event photos{retryCount > 0 ? ` (Retry ${retryCount}/3)` : ''}...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-16 text-red-500">
-            <p>{error}</p>
-            {renderDiagnosticInfo()}
           </div>
         ) : images.length > 0 ? (
           <div className="space-y-8">
