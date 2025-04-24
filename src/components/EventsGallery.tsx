@@ -56,6 +56,18 @@ const motivationalTalks = [
   }
 ];
 
+// Define IIT logos for cards
+const iitLogos = [
+  "/images/logos/National_Institute_of_Technology,_Raipur_Logo.png",
+  "/images/logos/National_Institute_of_Technology,_Hamirpur_Logo.png",
+  "/images/logos/Picture2.png",
+  "/images/logos/National_Institute_of_Technology,_Tiruchirappalli.svg.png",
+  "/placeholder-image.svg" // Fallback for the fifth item
+];
+
+// Fallback logo in case the primary ones fail
+const FALLBACK_LOGO = "/placeholder-image.svg";
+
 const EventsGallery = () => {
   const [images, setImages] = useState<DriveImage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -328,9 +340,21 @@ const EventsGallery = () => {
         </p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          {motivationalTalks.map((talk) => (
-            <Card key={talk.id} className="h-36 shadow-sm hover:shadow-md transition-shadow">
-              {/* Empty card */}
+          {motivationalTalks.map((talk, index) => (
+            <Card key={talk.id} className="h-48 shadow-sm hover:shadow-md transition-shadow flex flex-col items-center p-4">
+              <div className="flex-1 flex items-center justify-center w-full mb-2">
+                <img 
+                  src={iitLogos[index]} 
+                  alt={`Institute ${index + 1}`} 
+                  className="max-h-28 max-w-full object-contain"
+                  onError={(e) => {
+                    // If the image fails to load, use the fallback image
+                    (e.target as HTMLImageElement).src = FALLBACK_LOGO;
+                    console.log(`Failed to load logo at index ${index}, using fallback`);
+                  }}
+                />
+              </div>
+              <p className="text-xs text-center font-medium text-gray-600 mt-auto">{talk.title}</p>
             </Card>
           ))}
         </div>
