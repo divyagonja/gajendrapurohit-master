@@ -44,7 +44,7 @@ const Hero = () => {
 
             <TextReveal delay={400}>
               <p className="text-lg md:text-xl text-muted-foreground mt-6 mb-10 animate-slide-up delay-400">
-              YouTuber & Founder of Mathscare, inspiring students with motivational talks & educational content.
+                YouTuber & Founder of Mathscare, inspiring students with motivational talks & educational content.
               </p>
             </TextReveal>
 
@@ -52,16 +52,16 @@ const Hero = () => {
               <div className="mt-10 flex justify-center gap-4">
                 <Button 
                   size="lg" 
-                  className="mr-4 relative animated-gradient-btn"
+                  className="mr-4 relative animated-gradient-btn bg-white/20 text-foreground hover:!bg-opacity-0 transition-all duration-300 dark:text-white dark:bg-primary/20"
                   onClick={() => scrollToSection("#about")}
                 >
-                  <span className="relative z-10">View My Work</span>
+                  <span className="relative z-10 font-semibold text-foreground dark:text-white">View My Work</span>
                   <span className="absolute inset-0 rounded-xl animate-glow-border"></span>
                 </Button>
                 <Button 
                   variant="outline" 
                   size="lg"
-                  className="z-10"
+                  className="z-10 border-primary/50 text-foreground hover:bg-primary/10 dark:border-white/40 dark:text-white dark:hover:bg-white/10"
                   onClick={() => scrollToSection("#contact")}
                 >
                   Get In Touch
