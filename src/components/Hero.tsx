@@ -53,7 +53,7 @@ const Hero = () => {
                 <Button 
                   size="lg" 
                   className="mr-4 relative animated-gradient-btn"
-                  onClick={() => scrollToSection("#projects")}
+                  onClick={() => scrollToSection("#about")}
                 >
                   <span className="relative z-10">View My Work</span>
                   <span className="absolute inset-0 rounded-xl animate-glow-border"></span>

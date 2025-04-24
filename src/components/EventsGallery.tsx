@@ -286,33 +286,26 @@ const EventsGallery = () => {
           <div className="flex gap-2">
             <button 
               onClick={handleForceRefresh}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all shadow-md hover:shadow-lg flex items-center gap-3 transform hover:scale-105 duration-200"
               disabled={isLoading}
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Loading...' : 'Refresh Gallery'}
+              <svg 
+                className={`w-5 h-5 ${isLoading ? 'animate-spin' : 'animate-pulse'}`} 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor" 
+                strokeWidth="2"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+                />
+              </svg>
+              <span className="font-medium">
+                {isLoading ? 'Loading Gallery...' : 'Refresh Gallery'}
+              </span>
             </button>
-            
-            {!isAuthenticated ? (
-              <button 
-                onClick={handleAuthSignIn}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-2"
-                disabled={isLoading}
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748z"/>
-                </svg>
-                Sign in with Google
-              </button>
-            ) : (
-              <button 
-                onClick={handleAuthSignOut}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-                disabled={isLoading}
-              >
-                Sign Out
-              </button>
-            )}
           </div>
         </div>
         
