@@ -3,6 +3,7 @@ import { GalleryHorizontal, RefreshCw, ExternalLink, Youtube } from "lucide-reac
 import { getEventImages, DriveImage, signIn, signOut, initOAuth, FOLDER_ID, API_KEY, clearImageCache } from "../utils/googleDriveApi";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
 
 // Preload all images to avoid CORS issues
 const preloadImage = (url: string): Promise<void> => {
@@ -62,7 +63,7 @@ const iitLogos = [
   "/images/logos/National_Institute_of_Technology,_Hamirpur_Logo.png",
   "/images/logos/Picture2.png",
   "/images/logos/National_Institute_of_Technology,_Tiruchirappalli.svg.png",
-  "/placeholder-image.svg" // Fallback for the fifth item
+  "/images/logos/National_Institute_of_Technology,_Patna_Logo.png" // Using NIT Patna logo for the fifth card
 ];
 
 // Fallback logo in case the primary ones fail
@@ -89,6 +90,7 @@ const EventsGallery = () => {
   const [imgLoadAttempts, setImgLoadAttempts] = useState<Record<number, number>>({});
   const [retryCount, setRetryCount] = useState(0);
   const [forceRefresh, setForceRefresh] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     console.log("EventsGallery: Component mounted");
@@ -339,24 +341,70 @@ const EventsGallery = () => {
           Get inspired by Dr. Gajendra Purohit's motivational talks that help students overcome challenges and achieve academic excellence.
         </p>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          {motivationalTalks.map((talk, index) => (
-            <Card key={talk.id} className="h-48 shadow-sm hover:shadow-md transition-shadow flex flex-col items-center p-4">
-              <div className="flex-1 flex items-center justify-center w-full mb-2">
-                <img 
-                  src={iitLogos[index]} 
-                  alt={`Institute ${index + 1}`} 
-                  className="max-h-28 max-w-full object-contain"
-                  onError={(e) => {
-                    // If the image fails to load, use the fallback image
-                    (e.target as HTMLImageElement).src = FALLBACK_LOGO;
-                    console.log(`Failed to load logo at index ${index}, using fallback`);
-                  }}
-                />
-              </div>
-              <p className="text-xs text-center font-medium text-gray-600 mt-auto">{talk.title}</p>
-            </Card>
-          ))}
+        <div className="overflow-hidden">
+          <motion.div 
+            className="flex"
+            animate={{
+              x: isPaused ? "0%" : ["0%", "-50%"]
+            }}
+            transition={{
+              x: {
+                repeat: Infinity,
+                repeatType: "loop",
+                duration: 20,
+                ease: "linear"
+              }
+            }}
+            initial={false}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            style={{ 
+              willChange: "transform",
+              cursor: "pointer"
+            }}
+          >
+            {/* First set of cards */}
+            <div className="flex gap-6 min-w-full">
+              {motivationalTalks.map((talk, index) => (
+                <Card key={`a-${talk.id}`} className="h-48 shadow-sm hover:shadow-md transition-shadow flex flex-col items-center p-4 min-w-[200px]">
+                  <div className="flex-1 flex items-center justify-center w-full mb-2">
+                    <img 
+                      src={iitLogos[index]} 
+                      alt={`Institute ${index + 1}`} 
+                      className="max-h-28 max-w-full object-contain"
+                      onError={(e) => {
+                        // If the image fails to load, use the fallback image
+                        (e.target as HTMLImageElement).src = FALLBACK_LOGO;
+                        console.log(`Failed to load logo at index ${index}, using fallback`);
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-center font-medium text-gray-600 mt-auto">{talk.title}</p>
+                </Card>
+              ))}
+            </div>
+            
+            {/* Duplicate set for seamless loop */}
+            <div className="flex gap-6 min-w-full">
+              {motivationalTalks.map((talk, index) => (
+                <Card key={`b-${talk.id}`} className="h-48 shadow-sm hover:shadow-md transition-shadow flex flex-col items-center p-4 min-w-[200px]">
+                  <div className="flex-1 flex items-center justify-center w-full mb-2">
+                    <img 
+                      src={iitLogos[index]} 
+                      alt={`Institute ${index + 1}`} 
+                      className="max-h-28 max-w-full object-contain"
+                      onError={(e) => {
+                        // If the image fails to load, use the fallback image
+                        (e.target as HTMLImageElement).src = FALLBACK_LOGO;
+                        console.log(`Failed to load logo at index ${index}, using fallback`);
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-center font-medium text-gray-600 mt-auto">{talk.title}</p>
+                </Card>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </div>
 

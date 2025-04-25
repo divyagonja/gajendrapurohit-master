@@ -6,6 +6,7 @@ import SocialLinks from "@/components/SocialLinks";
 import EventsGallery from "@/components/EventsGallery";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
+import MotivationalTalks from "@/components/MotivationalTalks";
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
       <Hero />
       <About />
       <FeaturedChannels />
+      <MotivationalTalks />
       <SocialLinks />
       <EventsGallery />
       <Contact />

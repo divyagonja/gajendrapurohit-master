@@ -28,14 +28,7 @@ const motivationalTalks = [
     id: 4,
     title: "Effective Study Strategies",
     description: "Discover research-backed study techniques that will maximize your learning efficiency and retention.",
-    image: "/images/182A4172-e1728803050785.jpg",
-    youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
-  },
-  {
-    id: 5,
-    title: "Balancing Studies and Personal Life",
-    description: "Learn how to maintain a healthy balance between academic pursuits and personal well-being for sustainable success.",
-    image: "/images/182A4172-e1728803050785.jpg",
+    image: "/images/logos/National_Institute_of_Technology,_Patna_Logo.png",
     youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
   }
 ];
@@ -49,7 +42,7 @@ const MotivationalTalks = () => {
           Get inspired by Dr. Gajendra Purohit's motivational talks that help students overcome challenges and achieve academic excellence.
         </p>
         
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {motivationalTalks.map((talk) => (
             <Card key={talk.id} className="h-full">
               <div className="h-36 overflow-hidden">
