@@ -22,35 +22,35 @@ const PLACEHOLDER_IMAGE_URL = "/placeholder-image.svg";
 const motivationalTalks = [
   {
     id: 1,
-    title: "How to Stay Motivated for Competitive Exams",
+    title: "NIT RAIPUR",
     description: "Master the mindset needed to stay motivated throughout your competitive exam preparation journey.",
     image: "/images/182A4172-e1728803050785.jpg",
     youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
   },
   {
     id: 2,
-    title: "Overcoming Math Anxiety",
+    title: "NIT HAMIRPUR",
     description: "Learn practical strategies to overcome math anxiety and build confidence in solving complex mathematical problems.",
     image: "/images/182A4172-e1728803050785.jpg",
     youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
   },
   {
     id: 3,
-    title: "Success Mindset for Students",
+    title: "NIT WARANGAL",
     description: "Develop the growth mindset that will help you achieve academic excellence and succeed in your educational journey.",
     image: "/images/182A4172-e1728803050785.jpg",
     youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
   },
   {
     id: 4,
-    title: "Effective Study Strategies",
+    title: "NIT TRICHY",
     description: "Discover research-backed study techniques that will maximize your learning efficiency and retention.",
     image: "/images/182A4172-e1728803050785.jpg",
     youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
   },
   {
     id: 5,
-    title: "Balancing Studies and Personal Life",
+    title: "NIT PATNA",
     description: "Learn how to maintain a healthy balance between academic pursuits and personal well-being for sustainable success.",
     image: "/images/182A4172-e1728803050785.jpg",
     youtubeUrl: "https://www.youtube.com/@gajendrapurohit",
@@ -351,7 +351,7 @@ const EventsGallery = () => {
               x: {
                 repeat: Infinity,
                 repeatType: "loop",
-                duration: 20,
+                duration: 8,
                 ease: "linear"
               }
             }}
