@@ -4,6 +4,14 @@ import { getEventImages, DriveImage, signIn, signOut, initOAuth, FOLDER_ID, API_
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import OptimizedImage from "./OptimizedImage";
+
+// Define interfaces for type safety
+interface PreloadResult {
+  success: boolean;
+  index: number;
+  url?: string;
+}
 
 // Preload all images to avoid CORS issues
 const preloadImage = (url: string): Promise<void> => {
@@ -12,6 +20,8 @@ const preloadImage = (url: string): Promise<void> => {
     img.onload = () => resolve();
     img.onerror = () => reject();
     img.src = url;
+    // Add crossOrigin attribute for better caching and CORS handling
+    img.crossOrigin = "anonymous";
   });
 };
 
@@ -144,50 +154,60 @@ const EventsGallery = () => {
       // Store the images first so UI shows something quickly
       setImages(imagesData);
       
-      // Then preload all main image URLs in the background
-      // We do this after setting the state so the UI is responsive
-      let loadedCount = 0;
-      
-      setTimeout(() => {
-        imagesData.forEach((image, index) => {
-          // Try to preload the main image
+      // Use a more efficient preloading strategy with Promise.allSettled
+      setTimeout(async () => {
+        // Create an array of preload promises
+        const preloadPromises = imagesData.map((image, index) => 
           preloadImage(image.src)
             .then(() => {
               console.log(`Preloaded image ${index}: ${image.fileName}`);
-              loadedCount++;
-              setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
+              return { success: true, index, url: image.src } as PreloadResult;
             })
             .catch(() => {
               console.log(`Failed to preload image ${index}, trying alternates`);
-              // Try each alternate URL
-              let triedAlternateUrl = false;
               
-              image.alternateUrls.forEach((altUrl, altIndex) => {
-                if (!triedAlternateUrl) {
-                  preloadImage(altUrl)
-                    .then(() => {
-                      console.log(`Successfully loaded alternate URL ${altIndex} for image ${index}`);
-                      // Update the image source to the working URL
-                      triedAlternateUrl = true;
-                      loadedCount++;
-                      setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
-                      
-                      // Update the specific image with the working URL
-                      setImages(currentImages => {
-                        const updatedImages = [...currentImages];
-                        if (updatedImages[index]) {
-                          updatedImages[index].src = altUrl;
-                        }
-                        return updatedImages;
-                      });
-                    })
-                    .catch(() => {
-                      console.log(`Failed to load alternate URL ${altIndex} for image ${index}`);
-                    });
-                }
-              });
-            });
+              // Try each alternate URL in sequence with Promise.race
+              const alternatePromises = image.alternateUrls.map((altUrl, altIndex) => 
+                preloadImage(altUrl)
+                  .then(() => {
+                    console.log(`Successfully loaded alternate URL ${altIndex} for image ${index}`);
+                    return { success: true, index, url: altUrl } as PreloadResult;
+                  })
+              );
+              
+              // Use Promise.race to get the first successful alternate
+              return alternatePromises.length > 0 
+                ? Promise.race(alternatePromises).catch(() => ({ success: false, index } as PreloadResult))
+                : Promise.resolve({ success: false, index } as PreloadResult);
+            })
+        );
+        
+        // Wait for all preload attempts to complete
+        const results = await Promise.allSettled(preloadPromises);
+        let loadedCount = 0;
+        
+        // Process results and update images
+        results.forEach(result => {
+          if (result.status === 'fulfilled') {
+            const data = result.value as PreloadResult;
+            if (data.success) {
+              loadedCount++;
+              
+              // Update image URL if it's an alternate and has a url property
+              if (data.url && data.url !== imagesData[data.index].src) {
+                setImages(currentImages => {
+                  const updatedImages = [...currentImages];
+                  if (updatedImages[data.index]) {
+                    updatedImages[data.index].src = data.url!;
+                  }
+                  return updatedImages;
+                });
+              }
+            }
+          }
         });
+        
+        setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
       }, 100);
       
       setRetryCount(0); // Reset retry count on success
@@ -469,13 +489,25 @@ const EventsGallery = () => {
                   key={i}
                   className={`absolute inset-0 transition-opacity duration-1000 ${i === currentIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 >
-                  <img
-                    src={img.src}
-                    alt={img.alt}
-                    className="h-full w-full object-contain"
-                    loading={i === 0 ? "eager" : "lazy"}
-                    onError={(e) => handleImageError(i, e)}
-                  />
+                  {img.fileId ? (
+                    <OptimizedImage
+                      fileId={img.fileId}
+                      alt={img.alt}
+                      className="h-full w-full"
+                      priority={i === currentIndex || i === (currentIndex + 1) % images.length}
+                      onError={() => handleImageError(i, { target: { src: PLACEHOLDER_IMAGE_URL } } as any)}
+                    />
+                  ) : (
+                    <img
+                      src={img.src}
+                      alt={img.alt}
+                      className="h-full w-full object-contain"
+                      loading={i === 0 || i === currentIndex || i === (currentIndex + 1) % images.length ? "eager" : "lazy"}
+                      onError={(e) => handleImageError(i, e)}
+                      decoding="async"
+                      fetchPriority={i === currentIndex ? "high" : "low"}
+                    />
+                  )}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-3">
                     <p className="text-sm">{img.fileName}</p>
                   </div>
@@ -515,14 +547,25 @@ const EventsGallery = () => {
                   key={i} 
                   onClick={() => goToSlide(i)}
                   className={`flex-shrink-0 h-16 w-24 rounded overflow-hidden transition-all ${i === currentIndex ? 'ring-2 ring-blue-600 scale-105' : 'opacity-70 hover:opacity-100'}`}
+                  aria-label={`Go to image ${i + 1}`}
                 >
-                  <img 
-                    src={img.thumbSrc} 
-                    alt={`Thumbnail ${i+1}`}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    onError={(e) => handleThumbnailError(i, e)}
-                  />
+                  {img.fileId ? (
+                    <OptimizedImage
+                      fileId={img.fileId}
+                      alt={`Thumbnail ${i+1}`}
+                      className="h-full w-full"
+                      onError={() => handleThumbnailError(i, { target: { src: PLACEHOLDER_IMAGE_URL } } as any)}
+                    />
+                  ) : (
+                    <img 
+                      src={img.thumbSrc} 
+                      alt={`Thumbnail ${i+1}`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => handleThumbnailError(i, e)}
+                    />
+                  )}
                 </button>
               ))}
             </div>

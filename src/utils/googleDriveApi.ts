@@ -212,16 +212,17 @@ export const clearImageCache = (): void => {
  * We use a direct Google Drive URL that works consistently across browsers
  */
 export const getImageUrl = (fileId: string): string => {
-  // This direct export URL is more reliable for direct access
-  return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  // Use the faster, more reliable googleusercontent.com URL format
+  // This is faster than the drive.google.com/uc URL
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1200`;
 };
 
 /**
  * Get a thumbnail URL for a Google Drive image
  */
 export const getThumbnailUrl = (fileId: string): string => {
-  // Direct thumbnail URL from Google Drive
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
+  // Use googleusercontent.com format for thumbnails too - faster loading
+  return `https://lh3.googleusercontent.com/d/${fileId}=w200-h200-p-k-nu`;
 };
 
 /**
@@ -275,7 +276,7 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
     }
     
     // Add timestamp to break cache
-    const cacheBuster = `&cb=${Date.now()}`;
+    const cacheBuster = `?cb=${Date.now()}`;
     
     // Enhanced console logging for debugging
     console.log("Starting to fetch images with these parameters:", {
@@ -292,7 +293,7 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
       
       try {
         // Use direct Google API URL with cache buster
-        const url = `/google-drive-api/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&pageSize=1000${cacheBuster}`;
+        const url = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&pageSize=1000`;
         console.log("OAuth URL:", url);
         
         const response = await fetch(url, {
@@ -335,7 +336,7 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
       }
       
       // Use direct Google API URL with API key and cache buster
-      const apiUrl = `/google-drive-api/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&key=${API_KEY}&pageSize=1000${cacheBuster}`;
+      const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&key=${API_KEY}&pageSize=1000`;
       
       console.log("Fetching images with API key...");
       console.log("API URL:", apiUrl);
@@ -346,7 +347,8 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache'
-          }
+          },
+          cache: 'no-store'
         });
         
         console.log("API key response status:", response.status);
@@ -360,33 +362,7 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
           console.log("Response status:", response.status);
           const errorText = await response.text();
           console.log("Error details:", errorText);
-          
-          // Try direct fetch from the API as a last resort
-          try {
-            const directUrl = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&key=${API_KEY}&pageSize=1000${cacheBuster}`;
-            
-            console.log("Trying direct API fetch...");
-            
-            const directResponse = await fetch(directUrl, {
-              headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
-              },
-              mode: 'cors'
-            });
-            
-            if (directResponse.ok) {
-              const directData = await directResponse.json();
-              files = directData.files || [];
-              console.log(`Found ${files.length} files through direct API fetch`);
-            } else {
-              throw new Error(`Direct API request failed with status ${directResponse.status}`);
-            }
-          } catch (directError) {
-            console.error("Direct API fetch failed:", directError);
-            throw new Error(`API request failed with status ${response.status}`);
-          }
+          throw new Error(`API request failed with status ${response.status}`);
         }
       } catch (apiError) {
         console.error("Error during API key fetch:", apiError);
@@ -396,16 +372,28 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
     
     // Process the files into image objects
     if (files.length > 0) {
-      // Add random timestamp to each image URL to prevent caching issues
-      const timestamp = Date.now();
+      // Sort files to ensure consistent display order
+      files.sort((a: any, b: any) => {
+        // Sort by name (or fallback to id if name missing)
+        return (a.name || a.id).localeCompare(b.name || b.id);
+      });
       
-      const images = files.map((file: any, index: number) => {
+      const images = files.map((file: any) => {
         // Create DriveImage object with all URLs and cache busters
         const image: DriveImage = {
-          src: `${getImageUrl(file.id)}${cacheBuster}`,
+          // Use googleusercontent.com format - much faster than drive.google.com
+          src: `https://lh3.googleusercontent.com/d/${file.id}=w1200${cacheBuster}`,
           alt: file.name || `Image ${file.id}`,
-          thumbSrc: `${file.thumbnailLink || getThumbnailUrl(file.id)}${cacheBuster}`,
-          alternateUrls: getAlternateUrls(file.id).map(url => `${url}${cacheBuster}&t=${timestamp + index}`),
+          // Use the optimized thumbnail format
+          thumbSrc: `https://lh3.googleusercontent.com/d/${file.id}=w200-h200-p-k-nu${cacheBuster}`,
+          alternateUrls: [
+            // Alternate image sizes for responsive loading
+            `https://lh3.googleusercontent.com/d/${file.id}=s0${cacheBuster}`,
+            `https://lh3.googleusercontent.com/d/${file.id}=w800${cacheBuster}`,
+            // Add the more traditional URL formats as fallbacks
+            `https://drive.google.com/uc?export=view&id=${file.id}${cacheBuster}`,
+            `https://drive.google.com/thumbnail?id=${file.id}&sz=w1000${cacheBuster}`
+          ],
           fileName: file.name || `Image ${file.id}`,
           fileId: file.id,
         };
