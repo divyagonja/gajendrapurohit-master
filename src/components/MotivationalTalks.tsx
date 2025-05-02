@@ -38,9 +38,12 @@ const MotivationalTalks = () => {
     <section id="motivational-talks" className="py-16 bg-muted/20">
       <div className="container mx-auto px-6">
         <h2 className="text-3xl md:text-4xl font-bold mb-8 text-center">Motivational Talks</h2>
-        <p className="text-center text-muted-foreground max-w-2xl mx-auto mb-12">
-          Get inspired by Dr. Gajendra Purohit's motivational talks that help students overcome challenges and achieve academic excellence.
-        </p>
+        
+        <div className="bg-primary/5 dark:bg-slate-800 border border-primary/20 rounded-lg py-4 px-6 mb-12 mx-auto max-w-3xl shadow-md">
+          <p className="text-center text-foreground dark:text-white text-lg font-medium leading-relaxed">
+            Get inspired by <span className="font-bold text-primary dark:text-blue-300">Dr. Gajendra Purohit's</span> motivational talks that help students overcome challenges and achieve academic excellence.
+          </p>
+        </div>
         
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {motivationalTalks.map((talk) => (

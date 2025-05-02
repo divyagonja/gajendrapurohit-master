@@ -7,6 +7,7 @@ import SocialLinks from "@/components/SocialLinks";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
 import EventsGallery from "@/components/EventsGallery";
+import ChatbotFAQ from "@/components/ChatbotFAQ";
 
 const Index = () => {
   useEffect(() => {
@@ -38,6 +39,7 @@ const Index = () => {
       <EventsGallery />
       <Contact />
       <Footer />
+      <ChatbotFAQ />
     </div>
   );
 };
