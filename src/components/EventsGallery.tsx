@@ -399,7 +399,7 @@ const EventsGallery = () => {
                       }}
                     />
                   </div>
-                  <p className="text-xs text-center font-medium text-gray-600 mt-auto">{talk.title}</p>
+                  <p className="text-xs text-center font-medium text-primary-foreground bg-primary px-2 py-1 rounded-md w-full">{talk.title}</p>
                 </Card>
               ))}
             </div>
@@ -420,7 +420,7 @@ const EventsGallery = () => {
                       }}
                     />
                   </div>
-                  <p className="text-xs text-center font-medium text-gray-600 mt-auto">{talk.title}</p>
+                  <p className="text-xs text-center font-medium text-primary-foreground bg-primary px-2 py-1 rounded-md w-full">{talk.title}</p>
                 </Card>
               ))}
             </div>
