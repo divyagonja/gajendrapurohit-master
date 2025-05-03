@@ -221,8 +221,8 @@ export const getImageUrl = (fileId: string): string => {
  * Get a thumbnail URL for a Google Drive image
  */
 export const getThumbnailUrl = (fileId: string): string => {
-  // Use the larger thumbnail size for better quality
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w500&usp=sharing`;
+  // Direct thumbnail link is more reliable than other formats
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200&usp=sharing`;
 };
 
 /**

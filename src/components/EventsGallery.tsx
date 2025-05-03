@@ -317,11 +317,22 @@ const EventsGallery = () => {
     const target = e.target as HTMLImageElement;
     console.log(`EventsGallery: Thumbnail ${index} failed to load`);
     
-    // Try using the main image if the thumbnail fails
+    // Try using a direct thumbnail URL format that's more reliable
     const currentImg = images[index];
+    const directThumbnailUrl = `https://drive.google.com/thumbnail?id=${currentImg.fileId}&sz=w200&usp=sharing`;
+    
+    // Check if we're not already using the direct thumbnail URL
+    if (target.src !== directThumbnailUrl) {
+      console.log(`Trying direct thumbnail URL for image ${index}: ${directThumbnailUrl}`);
+      target.src = directThumbnailUrl;
+      return;
+    }
+    
+    // If that fails too, try using the main image
     if (currentImg.src && currentImg.src !== target.src) {
       target.src = currentImg.src;
     } else {
+      // As a last resort, use a placeholder
       target.src = `https://via.placeholder.com/100x100?text=${index+1}`;
     }
   };
@@ -522,8 +533,12 @@ const EventsGallery = () => {
                       style={{ background: '#000' }} // Dark background for visibility
                     />
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-3">
-                    <p className="text-sm">{img.fileName}</p>
+                  <div className="absolute bottom-16 left-0 right-0 flex justify-center">
+                    <div className="bg-black/30 px-3 py-1 rounded-full">
+                      <span className="text-white text-sm">
+                        {currentIndex + 1} / {images.length}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -543,15 +558,6 @@ const EventsGallery = () => {
               >
                 ❯
               </button>
-              
-              {/* Current image indicator */}
-              <div className="absolute bottom-16 left-0 right-0 flex justify-center">
-                <div className="bg-black/30 px-3 py-1 rounded-full">
-                  <span className="text-white text-sm">
-                    {currentIndex + 1} / {images.length}
-                  </span>
-                </div>
-              </div>
             </div>
             
             {/* Thumbnail navigation */}
@@ -563,23 +569,16 @@ const EventsGallery = () => {
                   className={`flex-shrink-0 h-16 w-24 rounded overflow-hidden transition-all ${i === currentIndex ? 'ring-2 ring-blue-600 scale-105' : 'opacity-70 hover:opacity-100'}`}
                   aria-label={`Go to image ${i + 1}`}
                 >
-                  {img.fileId ? (
-                    <OptimizedImage
-                      fileId={img.fileId}
-                      alt={`Thumbnail ${i+1}`}
-                      className="h-full w-full"
-                      onError={() => handleThumbnailError(i, { target: { src: PLACEHOLDER_IMAGE_URL } } as any)}
-                    />
-                  ) : (
-                    <img 
-                      src={img.thumbSrc} 
-                      alt={`Thumbnail ${i+1}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => handleThumbnailError(i, e)}
-                    />
-                  )}
+                  <img 
+                    src={`https://drive.google.com/thumbnail?id=${img.fileId}&sz=w200&usp=sharing`}
+                    alt={`Thumbnail ${i+1}`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => handleThumbnailError(i, e)}
+                  />
                 </button>
               ))}
             </div>
@@ -596,3 +595,4 @@ const EventsGallery = () => {
 };
 
 export default EventsGallery;
+
