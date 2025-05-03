@@ -11,7 +11,7 @@ console.log("Available environment variables:", {
 });
 
 // Google Drive folder ID containing event images from environment variables
-export const FOLDER_ID = import.meta.env.VITE_DRIVE_FOLDER_ID || "1RAauiVmMeycO-rTEui4UA-PbyfRUyejD";
+export const FOLDER_ID = import.meta.env.VITE_DRIVE_FOLDER_ID || "1nBLShRNqH9574JRWAN7-LAkqaUCg2vqg";
 
 // Google API key for authenticated requests from environment variables
 export const API_KEY = import.meta.env.VITE_DRIVE_API_KEY || "AIzaSyBNCIBYnFPS0jtStcsVf9ytXsOJj28Jzo4";
@@ -212,17 +212,16 @@ export const clearImageCache = (): void => {
  * We use a direct Google Drive URL that works consistently across browsers
  */
 export const getImageUrl = (fileId: string): string => {
-  // Use the faster, more reliable googleusercontent.com URL format
-  // This is faster than the drive.google.com/uc URL
-  return `https://lh3.googleusercontent.com/d/${fileId}=w1200`;
+  // Use the direct link format that works more reliably
+  return `https://drive.google.com/uc?export=view&id=${fileId}`;
 };
 
 /**
  * Get a thumbnail URL for a Google Drive image
  */
 export const getThumbnailUrl = (fileId: string): string => {
-  // Use googleusercontent.com format for thumbnails too - faster loading
-  return `https://lh3.googleusercontent.com/d/${fileId}=w200-h200-p-k-nu`;
+  // Use the direct thumbnail URL for better compatibility
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
 };
 
 /**
@@ -233,23 +232,24 @@ export const getAlternateUrls = (fileId: string): string[] => {
   const urls = [
     // Direct view links for Google Drive
     `https://drive.google.com/uc?export=view&id=${fileId}`,
-    `https://drive.google.com/uc?id=${fileId}&export=download&format=jpg`,
+    `https://drive.google.com/uc?id=${fileId}`,
+    
+    // Direct download links
+    `https://drive.google.com/uc?id=${fileId}&export=download`,
     
     // Google Photo-style direct links (sometimes more reliable for images)
     `https://lh3.googleusercontent.com/d/${fileId}`,
     `https://lh3.googleusercontent.com/d/${fileId}=s0`,
-    `https://lh3.googleusercontent.com/d/${fileId}=w1000`,
     
-    // Larger thumbnails as fallback
+    // Thumbnails as fallback
     `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`,
-    `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`,
   ];
   
   // Add authenticated URLs if available
   if (accessToken) {
-    urls.push(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${accessToken}`);
+    urls.unshift(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${accessToken}`);
   } else if (API_KEY) {
-    urls.push(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`);
+    urls.unshift(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`);
   }
   
   return urls;
@@ -259,11 +259,8 @@ export const getAlternateUrls = (fileId: string): string[] => {
  * Get a list of images with URLs for the gallery component
  */
 export const getEventImages = async (): Promise<DriveImage[]> => {
-  // Check cache first
-  if (imageCache && imageCacheTimestamp && Date.now() - imageCacheTimestamp < CACHE_DURATION) {
-    console.log("Using cached image list:", imageCache.length, "images");
-    return imageCache;
-  }
+  // Always clear cache to ensure fresh images
+  clearImageCache();
   
   // Try to initialize OAuth first
   await initOAuth();
@@ -276,7 +273,7 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
     }
     
     // Add timestamp to break cache
-    const cacheBuster = `?cb=${Date.now()}`;
+    const cacheBuster = `&cb=${Date.now()}`;
     
     // Enhanced console logging for debugging
     console.log("Starting to fetch images with these parameters:", {
@@ -379,21 +376,21 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
       });
       
       const images = files.map((file: any) => {
+        // Get the primary source URL for this image
+        const primarySrc = getImageUrl(file.id);
+        
+        // Get thumbnail URL
+        const thumbSrc = getThumbnailUrl(file.id);
+        
+        // Get alternate URLs
+        const alternateUrls = getAlternateUrls(file.id);
+        
         // Create DriveImage object with all URLs and cache busters
         const image: DriveImage = {
-          // Use googleusercontent.com format - much faster than drive.google.com
-          src: `https://lh3.googleusercontent.com/d/${file.id}=w1200${cacheBuster}`,
+          src: primarySrc + cacheBuster,
           alt: file.name || `Image ${file.id}`,
-          // Use the optimized thumbnail format
-          thumbSrc: `https://lh3.googleusercontent.com/d/${file.id}=w200-h200-p-k-nu${cacheBuster}`,
-          alternateUrls: [
-            // Alternate image sizes for responsive loading
-            `https://lh3.googleusercontent.com/d/${file.id}=s0${cacheBuster}`,
-            `https://lh3.googleusercontent.com/d/${file.id}=w800${cacheBuster}`,
-            // Add the more traditional URL formats as fallbacks
-            `https://drive.google.com/uc?export=view&id=${file.id}${cacheBuster}`,
-            `https://drive.google.com/thumbnail?id=${file.id}&sz=w1000${cacheBuster}`
-          ],
+          thumbSrc: thumbSrc + cacheBuster,
+          alternateUrls: alternateUrls.map(url => url + cacheBuster),
           fileName: file.name || `Image ${file.id}`,
           fileId: file.id,
         };

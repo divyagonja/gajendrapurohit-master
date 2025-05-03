@@ -19,9 +19,34 @@ const preloadImage = (url: string): Promise<void> => {
     const img = new Image();
     img.onload = () => resolve();
     img.onerror = () => reject();
-    img.src = url;
+    
+    // Add cache buster to URL if not already present
+    const urlWithCacheBuster = url.includes('?') || url.includes('&cb=') 
+      ? url 
+      : `${url}${url.includes('?') ? '&' : '?'}cb=${Date.now()}`;
+    
     // Add crossOrigin attribute for better caching and CORS handling
     img.crossOrigin = "anonymous";
+    
+    // Set a timeout to reject if image takes too long to load
+    const timeout = setTimeout(() => {
+      console.log(`Preload timeout for: ${url}`);
+      reject();
+    }, 10000); // 10 seconds timeout
+    
+    // Clear timeout on load/error
+    img.onload = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      reject();
+    };
+    
+    // Start loading the image
+    img.src = urlWithCacheBuster;
   });
 };
 
@@ -274,6 +299,9 @@ const EventsGallery = () => {
       
       // Set new URL
       target.src = nextUrl;
+      
+      // Add crossOrigin attribute for CORS issues
+      target.crossOrigin = "anonymous";
     } else {
       // All alternates failed, use placeholder
       console.log(`EventsGallery: All URLs failed for image ${index}, using placeholder`);
@@ -328,6 +356,7 @@ const EventsGallery = () => {
             <li>API Key: {diagnosticInfo.apiKeySet ? '✅ Set' : '❌ Missing'}</li>
             <li>Current Folder ID: {FOLDER_ID || 'Not available'}</li>
             <li>Images successfully loaded: {diagnosticInfo.imagesLoaded || 0}</li>
+            <li>Check folder sharing settings: Make sure the folder is shared with "Anyone with the link"</li>
             {!diagnosticInfo.folderIdSet && (
               <li className="text-red-600">Add VITE_DRIVE_FOLDER_ID to your .env file</li>
             )}
@@ -341,6 +370,16 @@ const EventsGallery = () => {
               >
                 <RefreshCw className="w-3 h-3" /> Force Refresh
               </button>
+            </li>
+            <li className="mt-1">
+              <a 
+                href={`https://drive.google.com/drive/folders/${FOLDER_ID}`} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 bg-green-600 text-white rounded text-xs flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" /> Open Folder in Drive
+              </a>
             </li>
           </ul>
         </div>
