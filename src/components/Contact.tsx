@@ -1,10 +1,12 @@
-
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Mail, Phone, MapPin } from "lucide-react";
+
+// Google Sheet Apps Script URL - same as used in ChatbotFAQ
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwB5z5du9dUIrKG4EEjWNzaQf45UpmsK-V_wJlj8R0Hiqrw9HT6L8lnLJrmjnPN75Wauw/exec";
 
 const Contact = () => {
   const sectionRef = useRef<HTMLElement>(null);
@@ -15,6 +17,8 @@ const Contact = () => {
     subject: "",
     message: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -56,14 +60,40 @@ const Contact = () => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted", formState);
-    // Here you would typically send the form data to a server
-    alert("Thank you for your message! I'll get back to you soon.");
-    setFormState({
-      name: "",
-      email: "",
-      subject: "",
-      message: "",
+    setIsSubmitting(true);
+    setSubmitSuccess(false);
+    
+    // Format data for the Google Sheet
+    const formData = new FormData();
+    formData.append('name', formState.name);
+    formData.append('email', formState.email);
+    formData.append('subject', formState.subject);
+    formData.append('message', formState.message);
+    formData.append('timestamp', new Date().toISOString());
+    formData.append('sheet', 'contact'); // Indicate this is for the contact form sheet
+    
+    // POST to Apps Script Web App using no-cors mode
+    fetch(WEB_APP_URL, {
+      method: "POST",
+      mode: "no-cors", // Important for cross-origin requests to Google Apps Script
+      body: formData
+    })
+    .then(() => {
+      console.log("Contact form submitted to Google Sheets");
+      setSubmitSuccess(true);
+      setFormState({
+        name: "",
+        email: "",
+        subject: "",
+        message: "",
+      });
+    })
+    .catch(err => {
+      console.error("Submission error:", err);
+      alert("There was an error submitting your message. Please try again later.");
+    })
+    .finally(() => {
+      setIsSubmitting(false);
     });
   };
   
@@ -86,6 +116,11 @@ const Contact = () => {
           <div className="lg:col-span-2 opacity-0" ref={(el) => (contentRefs.current[1] = el)}>
             <Card className="p-6">
               <h3 className="text-xl font-bold mb-6">Send Me A Message</h3>
+              {submitSuccess && (
+                <div className="mb-6 p-4 bg-green-100 text-green-800 rounded-md">
+                  Thank you for your message! I'll get back to you soon.
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
@@ -99,6 +134,7 @@ const Contact = () => {
                       onChange={handleChange}
                       placeholder="Name"
                       required
+                      disabled={isSubmitting}
                     />
                   </div>
                   <div>
@@ -113,6 +149,7 @@ const Contact = () => {
                       onChange={handleChange}
                       placeholder="name@example.com"
                       required
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -128,6 +165,7 @@ const Contact = () => {
                     onChange={handleChange}
                     placeholder="Project Inquiry"
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
                 
@@ -143,11 +181,17 @@ const Contact = () => {
                     placeholder="Tell me about your project..."
                     rows={6}
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
                 
-                <Button type="submit" size="lg" className="w-full md:w-auto">
-                  Send Message
+                <Button 
+                  type="submit" 
+                  size="lg" 
+                  className="w-full md:w-auto"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </Button>
               </form>
             </Card>

@@ -1,20 +1,38 @@
 function doPost(e) {
   try {
-    // Get the spreadsheet and the active sheet
+    // Get the spreadsheet
     var ss = SpreadsheetApp.openById('1DV1KwLDOCuk3txwXZz9sm7PueaiWXVvInj-ve43ZSWY');
-    var sheet = ss.getSheetByName('Leads') || ss.getActiveSheet();
     
     // Get form data
     var formData = e.parameter;
+    var timestamp = new Date();
     
-    // Prepare row data
-    var rowData = [
-      new Date(),           // Timestamp
-      formData.name,        // Name
-      formData.email,       // Email
-      formData.phone,       // Phone
-      formData.goal,        // Goal
-    ];
+    // Determine which sheet to use based on the 'sheet' parameter
+    var sheetName = formData.sheet === 'contact' ? 'Contact Form' : 'Leads';
+    var sheet = ss.getSheetByName(sheetName) || ss.getActiveSheet();
+    
+    // Prepare row data based on form type
+    var rowData;
+    
+    if (formData.sheet === 'contact') {
+      // Contact form data
+      rowData = [
+        timestamp,              // Timestamp
+        formData.name,          // Name
+        formData.email,         // Email
+        formData.subject,       // Subject
+        formData.message        // Message
+      ];
+    } else {
+      // Chatbot FAQ form data
+      rowData = [
+        timestamp,              // Timestamp
+        formData.name,          // Name
+        formData.email,         // Email
+        formData.phone,         // Phone
+        formData.goal           // Goal
+      ];
+    }
     
     // Append data to sheet
     sheet.appendRow(rowData);
