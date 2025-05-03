@@ -212,16 +212,17 @@ export const clearImageCache = (): void => {
  * We use a direct Google Drive URL that works consistently across browsers
  */
 export const getImageUrl = (fileId: string): string => {
-  // Use the direct link format that works more reliably
-  return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  // Use a more reliable method that works even with restricted Drive permissions
+  // Add the 'usp=sharing' parameter which helps bypass some restrictions
+  return `https://drive.google.com/uc?export=view&id=${fileId}&usp=sharing`;
 };
 
 /**
  * Get a thumbnail URL for a Google Drive image
  */
 export const getThumbnailUrl = (fileId: string): string => {
-  // Use the direct thumbnail URL for better compatibility
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w200`;
+  // Use the larger thumbnail size for better quality
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w500&usp=sharing`;
 };
 
 /**
@@ -230,22 +231,26 @@ export const getThumbnailUrl = (fileId: string): string => {
 export const getAlternateUrls = (fileId: string): string[] => {
   // Try multiple formats in order of reliability
   const urls = [
-    // Direct view links for Google Drive
-    `https://drive.google.com/uc?export=view&id=${fileId}`,
-    `https://drive.google.com/uc?id=${fileId}`,
+    // Direct approach with sharing parameter
+    `https://drive.google.com/uc?id=${fileId}&export=view&usp=sharing`,
     
-    // Direct download links
-    `https://drive.google.com/uc?id=${fileId}&export=download`,
+    // Try with direct download
+    `https://drive.google.com/uc?id=${fileId}&export=download&usp=sharing`,
     
-    // Google Photo-style direct links (sometimes more reliable for images)
+    // Open in new window approach (can work when others fail)
+    `https://drive.google.com/file/d/${fileId}/preview`,
+    
+    // Embedded content URL
+    `https://drive.google.com/file/d/${fileId}/view`,
+    
+    // Try Google Photos-style direct links
     `https://lh3.googleusercontent.com/d/${fileId}`,
-    `https://lh3.googleusercontent.com/d/${fileId}=s0`,
     
-    // Thumbnails as fallback
+    // Use thumbnails as last resort
     `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`,
   ];
   
-  // Add authenticated URLs if available
+  // Add authenticated URLs if available - these are more likely to work
   if (accessToken) {
     urls.unshift(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&access_token=${accessToken}`);
   } else if (API_KEY) {
@@ -259,7 +264,7 @@ export const getAlternateUrls = (fileId: string): string[] => {
  * Get a list of images with URLs for the gallery component
  */
 export const getEventImages = async (): Promise<DriveImage[]> => {
-  // Always clear cache to ensure fresh images
+  // Clear cache to ensure fresh images
   clearImageCache();
   
   // Try to initialize OAuth first
@@ -272,144 +277,116 @@ export const getEventImages = async (): Promise<DriveImage[]> => {
       throw new Error("Missing Google Drive folder ID");
     }
     
+    console.log("Fetching images from folder ID:", FOLDER_ID);
+    
+    // Use a direct link to the Drive folder's contents
+    const folderUrl = `https://drive.google.com/drive/folders/${FOLDER_ID}`;
+    console.log("Folder URL for reference:", folderUrl);
+    
     // Add timestamp to break cache
     const cacheBuster = `&cb=${Date.now()}`;
     
-    // Enhanced console logging for debugging
-    console.log("Starting to fetch images with these parameters:", {
-      FOLDER_ID,
-      API_KEY: API_KEY ? 'Present' : 'Missing',
-      accessToken: accessToken ? 'Present' : 'Missing'
-    });
-    
+    // Try different APIs based on available credentials
     let files: any[] = [];
+    let error = null;
     
-    // Try to fetch images using OAuth if available
-    if (accessToken) {
-      console.log("Fetching images using OAuth token");
-      
+    // Try the API key approach first if available
+    if (API_KEY) {
       try {
-        // Use direct Google API URL with cache buster
-        const url = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&pageSize=1000`;
-        console.log("OAuth URL:", url);
+        const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType)&key=${API_KEY}&pageSize=100`;
+        console.log("Using API key method:", apiUrl);
         
-        const response = await fetch(url, {
+        const response = await fetch(apiUrl, {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
+            'Cache-Control': 'no-cache'
           }
         });
         
-        console.log("OAuth response status:", response.status);
-        
         if (response.ok) {
           const data = await response.json();
           files = data.files || [];
-          console.log(`Found ${files.length} files through OAuth`);
+          console.log(`Found ${files.length} files using API key`);
         } else {
-          // OAuth token might be invalid
-          console.log("OAuth request failed, trying API key");
-          console.log("Response status:", response.status);
-          const errorText = await response.text();
-          console.log("Error details:", errorText);
-          
-          accessToken = null;
-          localStorage.removeItem('gd_access_token');
-          localStorage.removeItem('gd_token_expiry');
+          error = `API key method failed with status ${response.status}`;
+          console.error(error);
         }
-      } catch (oauthError) {
-        console.error("Error during OAuth fetch:", oauthError);
+      } catch (err) {
+        error = "API key method failed: " + (err instanceof Error ? err.message : String(err));
+        console.error(error);
       }
     }
     
-    // If no files yet (OAuth failed or not available), try API key
-    if (files.length === 0) {
-      // Check if we have an API key
-      if (!API_KEY) {
-        console.error("Missing Google API key. Check your environment variables.");
-        throw new Error("Missing Google API key");
-      }
-      
-      // Use direct Google API URL with API key and cache buster
-      const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType,thumbnailLink)&key=${API_KEY}&pageSize=1000`;
-      
-      console.log("Fetching images with API key...");
-      console.log("API URL:", apiUrl);
-      
+    // Try OAuth approach if available and API key method failed
+    if (files.length === 0 && accessToken) {
       try {
-        const response = await fetch(apiUrl, {
+        const oauthUrl = `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,mimeType)&pageSize=100`;
+        console.log("Using OAuth method:", oauthUrl);
+        
+        const response = await fetch(oauthUrl, {
+          method: 'GET',
           headers: {
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
+            'Cache-Control': 'no-cache'
+          }
         });
         
-        console.log("API key response status:", response.status);
-        
         if (response.ok) {
           const data = await response.json();
           files = data.files || [];
-          console.log(`Found ${files.length} files through API key`);
+          console.log(`Found ${files.length} files using OAuth`);
         } else {
-          console.log("API request failed");
-          console.log("Response status:", response.status);
-          const errorText = await response.text();
-          console.log("Error details:", errorText);
-          throw new Error(`API request failed with status ${response.status}`);
+          error = `OAuth method failed with status ${response.status}`;
+          console.error(error);
         }
-      } catch (apiError) {
-        console.error("Error during API key fetch:", apiError);
-        throw apiError;
+      } catch (err) {
+        error = "OAuth method failed: " + (err instanceof Error ? err.message : String(err));
+        console.error(error);
       }
     }
     
-    // Process the files into image objects
-    if (files.length > 0) {
-      // Sort files to ensure consistent display order
-      files.sort((a: any, b: any) => {
-        // Sort by name (or fallback to id if name missing)
-        return (a.name || a.id).localeCompare(b.name || b.id);
-      });
-      
-      const images = files.map((file: any) => {
-        // Get the primary source URL for this image
-        const primarySrc = getImageUrl(file.id);
-        
-        // Get thumbnail URL
-        const thumbSrc = getThumbnailUrl(file.id);
-        
-        // Get alternate URLs
-        const alternateUrls = getAlternateUrls(file.id);
-        
-        // Create DriveImage object with all URLs and cache busters
-        const image: DriveImage = {
-          src: primarySrc + cacheBuster,
-          alt: file.name || `Image ${file.id}`,
-          thumbSrc: thumbSrc + cacheBuster,
-          alternateUrls: alternateUrls.map(url => url + cacheBuster),
-          fileName: file.name || `Image ${file.id}`,
-          fileId: file.id,
-        };
-        return image;
-      });
-      
-      console.log(`Successfully prepared ${images.length} images for gallery`);
-      
-      // Cache the result
-      imageCache = images;
-      imageCacheTimestamp = Date.now();
-      
-      return images;
-    } else {
-      console.error("No images found in the specified Google Drive folder");
-      throw new Error("No images found in the specified Google Drive folder");
+    // If no files found and no specific error, provide a generic error
+    if (files.length === 0) {
+      const errorMessage = error || "No files found in the specified folder";
+      throw new Error(errorMessage);
     }
+    
+    // Process files into DriveImage objects
+    console.log("Processing files into image objects", files);
+    
+    // Sort files by name for consistent ordering
+    files.sort((a: any, b: any) => {
+      return (a.name || a.id).localeCompare(b.name || b.id);
+    });
+    
+    // Map file metadata into DriveImage objects with all necessary URLs
+    const images = files.map((file: any) => {
+      // Use our utility functions to generate URLs
+      const src = getImageUrl(file.id);
+      const thumbSrc = getThumbnailUrl(file.id);
+      const alternateUrls = getAlternateUrls(file.id);
+      
+      return {
+        src: src + cacheBuster,
+        alt: file.name || `Image ${file.id}`,
+        thumbSrc: thumbSrc + cacheBuster,
+        alternateUrls: alternateUrls.map(url => url + cacheBuster),
+        fileName: file.name || `Image ${file.id}`,
+        fileId: file.id
+      };
+    });
+    
+    console.log(`Successfully prepared ${images.length} images for gallery`);
+    
+    // Update cache
+    imageCache = images;
+    imageCacheTimestamp = Date.now();
+    
+    return images;
   } catch (error) {
-    console.error("Error fetching images from Drive API:", error);
+    console.error("Error fetching images:", error);
     throw error;
   }
 };

@@ -173,72 +173,76 @@ const EventsGallery = () => {
       console.log(`EventsGallery: Received ${imagesData.length} images`, imagesData);
       
       if (imagesData.length === 0) {
-        throw new Error("No images were loaded");
+        throw new Error("No images were found in the folder");
       }
       
       // Store the images first so UI shows something quickly
       setImages(imagesData);
       
-      // Use a more efficient preloading strategy with Promise.allSettled
+      // Use a more efficient preloading strategy by loading only a few critical images first
       setTimeout(async () => {
-        // Create an array of preload promises
-        const preloadPromises = imagesData.map((image, index) => 
-          preloadImage(image.src)
-            .then(() => {
-              console.log(`Preloaded image ${index}: ${image.fileName}`);
-              return { success: true, index, url: image.src } as PreloadResult;
-            })
-            .catch(() => {
-              console.log(`Failed to preload image ${index}, trying alternates`);
-              
-              // Try each alternate URL in sequence with Promise.race
-              const alternatePromises = image.alternateUrls.map((altUrl, altIndex) => 
-                preloadImage(altUrl)
-                  .then(() => {
-                    console.log(`Successfully loaded alternate URL ${altIndex} for image ${index}`);
-                    return { success: true, index, url: altUrl } as PreloadResult;
-                  })
-              );
-              
-              // Use Promise.race to get the first successful alternate
-              return alternatePromises.length > 0 
-                ? Promise.race(alternatePromises).catch(() => ({ success: false, index } as PreloadResult))
-                : Promise.resolve({ success: false, index } as PreloadResult);
-            })
-        );
-        
-        // Wait for all preload attempts to complete
-        const results = await Promise.allSettled(preloadPromises);
-        let loadedCount = 0;
-        
-        // Process results and update images
-        results.forEach(result => {
-          if (result.status === 'fulfilled') {
-            const data = result.value as PreloadResult;
-            if (data.success) {
+        try {
+          // Just preload the first 5 images or fewer if there aren't enough
+          const imagesToPreload = Math.min(5, imagesData.length);
+          console.log(`EventsGallery: Preloading first ${imagesToPreload} images`);
+          
+          // Create preload promises for the first few images
+          const preloadPromises = [];
+          for (let i = 0; i < imagesToPreload; i++) {
+            const image = imagesData[i];
+            preloadPromises.push(
+              preloadImage(image.src)
+                .then(() => {
+                  console.log(`Preloaded image ${i}: ${image.fileName}`);
+                  return { success: true, index: i, url: image.src } as PreloadResult;
+                })
+                .catch(() => {
+                  console.log(`Failed to preload image ${i}, trying first alternate`);
+                  // Just try the first alternate URL
+                  if (image.alternateUrls.length > 0) {
+                    return preloadImage(image.alternateUrls[0])
+                      .then(() => {
+                        console.log(`Successfully loaded alternate URL for image ${i}`);
+                        return { success: true, index: i, url: image.alternateUrls[0] } as PreloadResult;
+                      })
+                      .catch(() => ({ success: false, index: i } as PreloadResult));
+                  }
+                  return { success: false, index: i } as PreloadResult;
+                })
+            );
+          }
+          
+          // Wait for all critical images to preload
+          const results = await Promise.allSettled(preloadPromises);
+          let loadedCount = 0;
+          
+          // Count successful loads
+          results.forEach(result => {
+            if (result.status === 'fulfilled' && result.value.success) {
               loadedCount++;
               
-              // Update image URL if it's an alternate and has a url property
-              if (data.url && data.url !== imagesData[data.index].src) {
+              // Update image URL if it's an alternate
+              if (result.value.url && result.value.url !== imagesData[result.value.index].src) {
                 setImages(currentImages => {
                   const updatedImages = [...currentImages];
-                  if (updatedImages[data.index]) {
-                    updatedImages[data.index].src = data.url!;
+                  if (updatedImages[result.value.index]) {
+                    updatedImages[result.value.index].src = result.value.url!;
                   }
                   return updatedImages;
                 });
               }
             }
-          }
-        });
-        
-        setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
+          });
+          
+          setDiagnosticInfo(prev => ({ ...prev, imagesLoaded: loadedCount }));
+        } catch (error) {
+          console.error("Error during image preloading:", error);
+        }
       }, 100);
       
       setRetryCount(0); // Reset retry count on success
     } catch (error) {
       console.error("Error loading images:", error);
-      setError("Failed to load images. Please check console for details.");
       
       // Retry loading a few times if failed
       if (retryCount < 3) {
@@ -363,14 +367,6 @@ const EventsGallery = () => {
             {!diagnosticInfo.apiKeySet && (
               <li className="text-red-600">Add VITE_DRIVE_API_KEY to your .env file</li>
             )}
-            <li className="mt-2">
-              <button 
-                onClick={handleForceRefresh}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-xs flex items-center gap-1"
-              >
-                <RefreshCw className="w-3 h-3" /> Force Refresh
-              </button>
-            </li>
             <li className="mt-1">
               <a 
                 href={`https://drive.google.com/drive/folders/${FOLDER_ID}`} 
@@ -386,6 +382,19 @@ const EventsGallery = () => {
       );
     }
     return null;
+  };
+
+  // When all image loading methods fail, use direct iframe embed
+  const renderDirectEmbed = (fileId: string) => {
+    const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+    return (
+      <iframe 
+        src={embedUrl} 
+        className="w-full h-full border-0" 
+        allow="autoplay" 
+        loading="lazy"
+      ></iframe>
+    );
   };
 
   return (
@@ -472,13 +481,6 @@ const EventsGallery = () => {
           <p className="text-red-500">{error}</p>
           {!diagnosticInfo.folderIdSet && <p className="text-yellow-500">Folder ID is not set!</p>}
           {!diagnosticInfo.apiKeySet && <p className="text-yellow-500">API Key is not set!</p>}
-          <button 
-            onClick={handleForceRefresh} 
-            className="mt-4 flex items-center gap-2 mx-auto bg-muted px-4 py-2 rounded-md hover:bg-muted/80 transition-colors"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span>Retry</span>
-          </button>
         </div>
       )}
       <div className="container mx-auto px-4">
@@ -486,31 +488,6 @@ const EventsGallery = () => {
           <div className="flex items-center gap-4">
             <GalleryHorizontal className="w-8 h-8 text-blue-600" />
             <h2 className="text-3xl font-bold">Event Photo Gallery</h2>
-          </div>
-          
-          <div className="flex gap-2">
-            <button 
-              onClick={handleForceRefresh}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all shadow-md hover:shadow-lg flex items-center gap-3 transform hover:scale-105 duration-200"
-              disabled={isLoading}
-            >
-              <svg 
-                className={`w-5 h-5 ${isLoading ? 'animate-spin' : 'animate-pulse'}`} 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor" 
-                strokeWidth="2"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-                />
-              </svg>
-              <span className="font-medium">
-                {isLoading ? 'Loading Gallery...' : 'Refresh Gallery'}
-              </span>
-            </button>
           </div>
         </div>
         
@@ -528,14 +505,9 @@ const EventsGallery = () => {
                   key={i}
                   className={`absolute inset-0 transition-opacity duration-1000 ${i === currentIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 >
-                  {img.fileId ? (
-                    <OptimizedImage
-                      fileId={img.fileId}
-                      alt={img.alt}
-                      className="h-full w-full"
-                      priority={i === currentIndex || i === (currentIndex + 1) % images.length}
-                      onError={() => handleImageError(i, { target: { src: PLACEHOLDER_IMAGE_URL } } as any)}
-                    />
+                  {imgLoadAttempts[i] && imgLoadAttempts[i] >= 3 ? (
+                    // After multiple failed attempts, use direct embed as fallback
+                    renderDirectEmbed(img.fileId)
                   ) : (
                     <img
                       src={img.src}
@@ -545,6 +517,9 @@ const EventsGallery = () => {
                       onError={(e) => handleImageError(i, e)}
                       decoding="async"
                       fetchPriority={i === currentIndex ? "high" : "low"}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      style={{ background: '#000' }} // Dark background for visibility
                     />
                   )}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-3">
